@@ -32,6 +32,10 @@ export const StorageService = {
     return data ? JSON.parse(data) : DEFAULT_CATEGORIES;
   },
 
+  saveCategories: (data: Category[]) => {
+    localStorage.setItem(KEYS.CATEGORIES, JSON.stringify(data));
+  },
+
   getActiveLedgerId: (): string => {
     return localStorage.getItem(KEYS.ACTIVE_LEDGER) || DEFAULT_LEDGERS[0].id;
   },

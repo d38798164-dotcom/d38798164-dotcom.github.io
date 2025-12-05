@@ -9,8 +9,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
       manifest: {
-        name: '喵喵记账',
-        short_name: '喵喵记账',
+        name: '老刘记账',
+        short_name: '老刘记账',
         description: '一款可爱风格的安卓优先记账应用',
         theme_color: '#fb7185',
         background_color: '#fff1f2',

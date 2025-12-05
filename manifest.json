@@ -1,6 +1,6 @@
 {
-  "name": "喵喵记账",
-  "short_name": "喵喵记账",
+  "name": "老刘记账",
+  "short_name": "老刘记账",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#fff1f2",

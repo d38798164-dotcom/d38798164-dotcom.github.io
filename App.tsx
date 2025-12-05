@@ -2,16 +2,16 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Plus, Calendar as CalendarIcon, PieChart, 
   WalletCards, Settings, ChevronLeft, ChevronRight,
-  Trash2, X, Check
+  Trash2, X, Check, Grid
 } from 'lucide-react';
 import { PieChart as RePieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 
 import { Transaction, Ledger, Category, TransactionType, ViewState, DailyGroup } from './types';
 import { StorageService } from './services/storage';
-import { DEFAULT_CATEGORIES } from './constants';
+import { Icons } from './constants';
 import { MobileLayout, Card, Button, IconView, formatMoney } from './components/Components';
 
-// --- Sub-components defined here for cohesion within the single-file request limit structure ---
+// --- Sub-components ---
 
 const BottomNav: React.FC<{ current: ViewState; onChange: (v: ViewState) => void; onAdd: () => void }> = ({ current, onChange, onAdd }) => (
   <div className="bg-white/90 backdrop-blur-md border-t border-rose-100 h-20 flex justify-around items-center px-4 absolute bottom-0 w-full z-10 pb-2">
@@ -46,6 +46,7 @@ const App: React.FC = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [activeLedgerId, setActiveLedgerId] = useState<string>('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isAddLedgerModalOpen, setIsAddLedgerModalOpen] = useState(false);
   
   // Date Filter State
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -66,6 +67,14 @@ const App: React.FC = () => {
   useEffect(() => {
     if (activeLedgerId) StorageService.setActiveLedgerId(activeLedgerId);
   }, [activeLedgerId]);
+  
+  useEffect(() => {
+    if (ledgers.length > 0) StorageService.saveLedgers(ledgers);
+  }, [ledgers]);
+
+  useEffect(() => {
+    if (categories.length > 0) StorageService.saveCategories(categories);
+  }, [categories]);
 
   // Derived Data
   const currentLedger = ledgers.find(l => l.id === activeLedgerId) || ledgers[0];
@@ -90,7 +99,7 @@ const App: React.FC = () => {
     return { income, expense, balance: income - expense };
   }, [filteredTransactions]);
 
-  // Calculate Total Assets (Global Balance for current Ledger)
+  // Calculate Total Assets
   const totalBalance = useMemo(() => {
     return transactions
       .filter(t => t.ledgerId === activeLedgerId)
@@ -134,6 +143,23 @@ const App: React.FC = () => {
     setCurrentDate(newDate);
   };
 
+  const handleAddLedger = (name: string, color: string, icon: string) => {
+    const newLedger: Ledger = {
+      id: 'l' + Date.now(),
+      name,
+      coverColor: color,
+      icon
+    };
+    setLedgers(prev => [...prev, newLedger]);
+    setActiveLedgerId(newLedger.id);
+    setIsAddLedgerModalOpen(false);
+    setView('home');
+  };
+
+  const handleAddCategory = (newCat: Category) => {
+    setCategories(prev => [...prev, newCat]);
+  };
+
   // --- Views ---
 
   const renderHome = () => (
@@ -172,7 +198,7 @@ const App: React.FC = () => {
               <div className="bg-yellow-100 p-1 rounded-full text-yellow-500">
                  <IconView name="PiggyBank" size={14} />
               </div>
-              <span className="text-xs font-medium">总资产</span>
+              <span className="text-xs font-medium">当前余额</span>
               <span className="text-sm font-bold text-gray-800">¥{formatMoney(totalBalance)}</span>
             </div>
           </div>
@@ -368,8 +394,10 @@ const App: React.FC = () => {
           </div>
         ))}
         
-        {/* Add Ledger Placeholder (Non-functional for demo brevity) */}
-        <div className="border-2 border-dashed border-gray-300 rounded-3xl p-6 flex flex-col items-center justify-center text-gray-400 gap-2 cursor-pointer hover:bg-gray-100/50">
+        <div 
+          onClick={() => setIsAddLedgerModalOpen(true)}
+          className="border-2 border-dashed border-gray-300 rounded-3xl p-6 flex flex-col items-center justify-center text-gray-400 gap-2 cursor-pointer hover:bg-gray-100/50"
+        >
            <Plus size={32} />
            <span className="text-sm">新建账本</span>
         </div>
@@ -395,33 +423,178 @@ const App: React.FC = () => {
         <AddTransactionModal 
           onClose={() => setIsAddModalOpen(false)} 
           onSave={handleAddTransaction}
+          onAddCategory={handleAddCategory}
           categories={categories}
+        />
+      )}
+
+      {isAddLedgerModalOpen && (
+        <AddLedgerModal 
+          onClose={() => setIsAddLedgerModalOpen(false)}
+          onSave={handleAddLedger}
         />
       )}
     </MobileLayout>
   );
 };
 
-// --- Add Transaction Modal (Complex Component) ---
+// --- Add Ledger Modal ---
+
+interface AddLedgerModalProps {
+  onClose: () => void;
+  onSave: (name: string, color: string, icon: string) => void;
+}
+
+const AddLedgerModal: React.FC<AddLedgerModalProps> = ({ onClose, onSave }) => {
+  const [name, setName] = useState('');
+  const [selectedColor, setSelectedColor] = useState('bg-rose-400');
+  
+  const colors = [
+    'bg-rose-400', 'bg-sky-400', 'bg-emerald-400', 'bg-amber-400', 
+    'bg-purple-400', 'bg-indigo-400', 'bg-pink-400', 'bg-gray-500'
+  ];
+
+  return (
+    <div className="absolute inset-0 bg-black/50 z-50 flex items-center justify-center backdrop-blur-sm p-6">
+      <div className="bg-white rounded-[2rem] p-6 w-full max-w-sm shadow-2xl animate-fade-in">
+        <h3 className="text-xl font-bold mb-4 text-center">新建账本</h3>
+        
+        <div className="bg-gray-50 rounded-xl px-4 py-3 mb-4">
+          <input 
+            type="text" 
+            placeholder="账本名称 (如: 私房钱)"
+            className="bg-transparent w-full outline-none font-bold text-gray-700 placeholder-gray-300"
+            value={name}
+            onChange={e => setName(e.target.value)}
+          />
+        </div>
+
+        <p className="text-xs text-gray-400 mb-2 px-2">选择封面颜色</p>
+        <div className="flex flex-wrap gap-3 mb-6 px-2">
+          {colors.map(c => (
+             <div 
+               key={c} 
+               onClick={() => setSelectedColor(c)}
+               className={`w-8 h-8 rounded-full ${c} cursor-pointer transition-transform ${selectedColor === c ? 'scale-125 ring-2 ring-gray-300 border-2 border-white' : ''}`}
+             />
+          ))}
+        </div>
+
+        <div className="flex gap-4">
+          <Button variant="secondary" onClick={onClose} className="flex-1">取消</Button>
+          <Button 
+             variant="primary" 
+             onClick={() => name && onSave(name, selectedColor, 'Cat')} 
+             className="flex-1"
+             disabled={!name}
+          >
+            创建
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// --- Custom Category Modal (Small overlay) ---
+
+interface AddCategoryModalProps {
+  type: TransactionType;
+  onClose: () => void;
+  onSave: (cat: Category) => void;
+}
+
+const AddCategoryModal: React.FC<AddCategoryModalProps> = ({ type, onClose, onSave }) => {
+  const [name, setName] = useState('');
+  const [selectedIcon, setSelectedIcon] = useState('Star');
+  const [selectedColor, setSelectedColor] = useState('bg-rose-400');
+
+  const icons = ['Star', 'HeartPulse', 'Car', 'Baby', 'Briefcase', 'ShoppingBag', 'Coffee', 'Cat', 'Dog', 'Home', 'Zap', 'Music'];
+  const colors = ['bg-rose-400', 'bg-sky-400', 'bg-emerald-400', 'bg-amber-400', 'bg-purple-400', 'bg-slate-500'];
+
+  const handleSave = () => {
+    if (!name) return;
+    onSave({
+      id: 'custom_' + Date.now(),
+      name,
+      icon: selectedIcon,
+      type,
+      color: selectedColor
+    });
+    onClose();
+  };
+
+  return (
+    <div className="absolute inset-0 bg-white z-[60] flex flex-col p-6 animate-slide-up">
+       <div className="flex justify-between items-center mb-6">
+         <h3 className="text-xl font-bold">添加{type === 'expense' ? '支出' : '收入'}分类</h3>
+         <button onClick={onClose}><X /></button>
+       </div>
+
+       <div className="flex justify-center mb-6">
+         <div className={`w-16 h-16 rounded-full flex items-center justify-center text-white ${selectedColor} shadow-lg transition-colors`}>
+           <IconView name={selectedIcon} size={32} />
+         </div>
+       </div>
+
+       <div className="bg-gray-50 rounded-xl px-4 py-3 mb-6">
+          <input 
+            type="text" 
+            placeholder="分类名称"
+            maxLength={4}
+            className="bg-transparent w-full outline-none font-bold text-center text-gray-700 placeholder-gray-300"
+            value={name}
+            onChange={e => setName(e.target.value)}
+          />
+        </div>
+
+        <div className="mb-4">
+           <p className="text-xs text-gray-400 mb-2">选择图标</p>
+           <div className="grid grid-cols-6 gap-4">
+             {icons.map(icon => (
+               <div key={icon} onClick={() => setSelectedIcon(icon)} className={`p-2 rounded-xl flex justify-center ${selectedIcon === icon ? 'bg-gray-100' : ''}`}>
+                 <IconView name={icon} className="text-gray-600" />
+               </div>
+             ))}
+           </div>
+        </div>
+
+        <div className="mb-8">
+           <p className="text-xs text-gray-400 mb-2">选择颜色</p>
+           <div className="flex flex-wrap gap-4">
+             {colors.map(c => (
+               <div key={c} onClick={() => setSelectedColor(c)} className={`w-8 h-8 rounded-full ${c} ${selectedColor === c ? 'ring-2 ring-gray-300 border-2 border-white' : ''}`}></div>
+             ))}
+           </div>
+        </div>
+
+        <Button onClick={handleSave} disabled={!name}>保存分类</Button>
+    </div>
+  );
+};
+
+
+// --- Add Transaction Modal ---
 
 interface AddTransactionProps {
   onClose: () => void;
   onSave: (tx: Omit<Transaction, 'id' | 'timestamp' | 'ledgerId'>) => void;
+  onAddCategory: (cat: Category) => void;
   categories: Category[];
 }
 
-const AddTransactionModal: React.FC<AddTransactionProps> = ({ onClose, onSave, categories }) => {
+const AddTransactionModal: React.FC<AddTransactionProps> = ({ onClose, onSave, onAddCategory, categories }) => {
   const [amount, setAmount] = useState('0');
   const [type, setType] = useState<TransactionType>('expense');
   const [selectedCatId, setSelectedCatId] = useState<string>('');
   const [note, setNote] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [isCustomCatOpen, setIsCustomCatOpen] = useState(false);
 
-  // Set default category when type changes
   useEffect(() => {
     const firstCat = categories.find(c => c.type === type);
-    if (firstCat) setSelectedCatId(firstCat.id);
-  }, [type, categories]);
+    if (firstCat && !selectedCatId) setSelectedCatId(firstCat.id);
+  }, [type, categories, selectedCatId]);
 
   const handleNumPad = (val: string) => {
     if (val === 'backspace') {
@@ -449,24 +622,31 @@ const AddTransactionModal: React.FC<AddTransactionProps> = ({ onClose, onSave, c
 
   return (
     <div className="absolute inset-0 bg-black/50 z-50 flex flex-col justify-end backdrop-blur-sm animate-fade-in">
-      <div className="bg-white rounded-t-[2rem] h-[85vh] flex flex-col w-full shadow-2xl animate-slide-up">
+      {isCustomCatOpen ? (
+        <AddCategoryModal 
+          type={type} 
+          onClose={() => setIsCustomCatOpen(false)}
+          onSave={onAddCategory}
+        />
+      ) : (
+        <div className="bg-white rounded-t-[2rem] h-[85vh] flex flex-col w-full shadow-2xl animate-slide-up">
         {/* Header */}
         <div className="flex justify-between items-center p-4 border-b border-gray-100">
           <button onClick={onClose} className="p-2 text-gray-400 hover:bg-gray-100 rounded-full"><X size={24} /></button>
           <div className="flex bg-gray-100 rounded-full p-1">
              <button 
-                onClick={() => setType('expense')}
+                onClick={() => { setType('expense'); setSelectedCatId(''); }}
                 className={`px-6 py-1.5 rounded-full text-sm font-bold transition-all ${type === 'expense' ? 'bg-white text-rose-500 shadow-sm' : 'text-gray-400'}`}
              >支出</button>
              <button 
-                onClick={() => setType('income')}
+                onClick={() => { setType('income'); setSelectedCatId(''); }}
                 className={`px-6 py-1.5 rounded-full text-sm font-bold transition-all ${type === 'income' ? 'bg-white text-emerald-500 shadow-sm' : 'text-gray-400'}`}
              >收入</button>
           </div>
-          <div className="w-10"></div> {/* Spacer */}
+          <div className="w-10"></div>
         </div>
 
-        {/* Amount Display */}
+        {/* Amount */}
         <div className="px-6 py-4 text-right">
            <div className="text-xs text-gray-400 mb-1">金额</div>
            <div className="text-4xl font-bold text-gray-800 tracking-wider">
@@ -476,23 +656,33 @@ const AddTransactionModal: React.FC<AddTransactionProps> = ({ onClose, onSave, c
 
         {/* Categories Grid */}
         <div className="flex-1 overflow-y-auto px-4 py-2 no-scrollbar">
-          <div className="grid grid-cols-4 gap-4 mb-4">
+          <div className="grid grid-cols-5 gap-y-4">
             {filteredCategories.map(cat => (
               <div 
                 key={cat.id} 
                 className="flex flex-col items-center gap-2 cursor-pointer"
                 onClick={() => setSelectedCatId(cat.id)}
               >
-                <div className={`w-14 h-14 rounded-full flex items-center justify-center transition-all ${selectedCatId === cat.id ? `${cat.color} text-white scale-110 shadow-lg` : 'bg-gray-100 text-gray-400'}`}>
-                   <IconView name={cat.icon} size={24} />
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${selectedCatId === cat.id ? `${cat.color} text-white scale-110 shadow-lg` : 'bg-gray-100 text-gray-400'}`}>
+                   <IconView name={cat.icon} size={20} />
                 </div>
-                <span className={`text-xs ${selectedCatId === cat.id ? 'font-bold text-gray-800' : 'text-gray-400'}`}>{cat.name}</span>
+                <span className={`text-[10px] ${selectedCatId === cat.id ? 'font-bold text-gray-800' : 'text-gray-400'}`}>{cat.name}</span>
               </div>
             ))}
+            {/* Custom Category Button */}
+            <div 
+              className="flex flex-col items-center gap-2 cursor-pointer opacity-50 hover:opacity-100"
+              onClick={() => setIsCustomCatOpen(true)}
+            >
+              <div className="w-12 h-12 rounded-full flex items-center justify-center bg-gray-100 text-gray-400 border-2 border-dashed border-gray-300">
+                  <Plus size={20} />
+              </div>
+              <span className="text-[10px] text-gray-400">自定义</span>
+            </div>
           </div>
           
           {/* Note & Date */}
-          <div className="flex gap-3 mt-4 px-2">
+          <div className="flex gap-3 mt-6 px-2">
             <div className="flex-1 bg-gray-50 rounded-xl px-4 py-3 flex items-center gap-2">
                <span className="text-gray-400 text-sm">备注</span>
                <input 
@@ -517,8 +707,7 @@ const AddTransactionModal: React.FC<AddTransactionProps> = ({ onClose, onSave, c
 
         {/* Numpad */}
         <div className="grid grid-cols-4 bg-gray-50 p-2 gap-1 pb-6">
-          {['1','2','3','DEL', '4','5','6', 'OK', '7','8','9', '0', '.'].map((key, idx) => {
-             // Custom layout logic for grid
+          {['1','2','3','DEL', '4','5','6', 'OK', '7','8','9', '0', '.'].map((key) => {
              if (key === 'OK') {
                return (
                  <button 
@@ -535,12 +724,10 @@ const AddTransactionModal: React.FC<AddTransactionProps> = ({ onClose, onSave, c
              if (key === 'DEL') {
                return (
                  <button key={key} onClick={() => handleNumPad('backspace')} className="bg-white rounded-xl py-4 shadow-sm active:bg-gray-100 text-gray-500 font-bold flex justify-center items-center">
-                   <IconView name="Delete" className="hidden" /> {/* Placeholder */}
                    ←
                  </button>
                )
              }
-             
              let gridClass = "bg-white rounded-xl py-4 shadow-sm active:bg-gray-100 text-xl font-bold text-gray-700";
              if(key === '0') gridClass += " col-span-2";
              
@@ -556,6 +743,7 @@ const AddTransactionModal: React.FC<AddTransactionProps> = ({ onClose, onSave, c
           })}
         </div>
       </div>
+      )}
     </div>
   );
 };

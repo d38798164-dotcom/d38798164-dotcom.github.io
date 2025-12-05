@@ -16,6 +16,17 @@
     "noUnusedParameters": false,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["."],
+  "include": [
+    "./*.ts",      // 根目录下的 .ts 文件（如 index.ts、types.ts）
+    "./*.tsx",     // 根目录下的 .tsx 文件（如 App.tsx、constants.tsx）
+    "./*.js",      // 根目录下的 .js 文件（如 sw.js）
+    "components/**/*", // components 文件夹下的所有文件
+    "services/**/*"    // services 文件夹下的所有文件
+  ],
+  "exclude": [
+    "node_modules", // 排除第三方依赖
+    "dist",         // 排除打包后的文件夹
+    "*.config.ts"   // 排除配置文件（如 vite.config.ts）
+  ],
   "references": [{ "path": "./tsconfig.node.json" }]
 }
